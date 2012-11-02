@@ -49,6 +49,7 @@ enum integrationDomain {
     _Square,
     _Cube,
     _Tetrahedra,
+    _Wedge,
     _Embedded2dLine,
 };
 } // end namespace oofem

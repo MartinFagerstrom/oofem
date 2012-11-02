@@ -1737,6 +1737,60 @@ GaussIntegrationRule :: SetUpPointsOnTetrahedra(int nPoints,
 }
 
 int
+GaussIntegrationRule :: SetUpPointsOnWedge(int nPoints,
+                                             MaterialMode mode, GaussPoint ***arry)
+// creates array of nPoints Gauss Integration Points
+// ( don't confuse with GaussPoint - elem is only the container where to
+//   store coordinates and weights)
+{
+    FloatArray *coord1;
+	double weight;
+
+    switch ( nPoints ) {
+    case 1:
+
+        * arry              = new GaussPoint * [ nPoints ];
+
+        coord1             = new FloatArray(3);
+        coord1->at(1)    = 0.333333333333;
+        coord1->at(2)    = 0.333333333333;
+		coord1->at(3)    = 0.;
+		weight = 2.0*0.5;
+        ( * arry ) [ 0 ]        = new GaussPoint(this, 1, coord1, weight, mode);
+        break;
+
+    case 3:
+        ( * arry )             = new GaussPoint * [ nPoints ];
+
+        coord1             = new FloatArray(2);
+        coord1->at(1)    = 0.166666666666666667;
+        coord1->at(2)    = 0.166666666666666667;
+        ( * arry ) [ 0 ]         = new GaussPoint(this, 1, coord1, 0.16666667, mode);
+
+        coord1             = new FloatArray(2);
+        coord1->at(1)    = 0.666666666666666667;
+        coord1->at(2)    = 0.166666666666666667;
+        ( * arry ) [ 1 ]         = new GaussPoint(this, 2, coord1, 0.16666667, mode);
+
+        coord1             = new FloatArray(2);
+        coord1->at(1)    = 0.166666666666666667;
+        coord1->at(2)    = 0.666666666666666667;
+        ( * arry ) [ 2 ]         = new GaussPoint(this, 3, coord1, 0.16666667, mode);
+        break;
+
+
+
+  
+
+    default:
+        OOFEM_ERROR2("SetUpPointsOnWedge: unsupported number of IPs (%d)", nPoints);
+    }
+
+    return nPoints;
+}
+
+
+int
 GaussIntegrationRule :: getRequiredNumberOfIntegrationPoints(integrationDomain dType,
                                                              int approxOrder)
 {

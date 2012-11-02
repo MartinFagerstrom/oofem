@@ -86,6 +86,7 @@ protected:
     virtual int SetUpPointsOnSquare(int, MaterialMode, GaussPoint * * *);
     virtual int SetUpPointsOnCube(int, MaterialMode, GaussPoint * * *);
     virtual int SetUpPointsOnTetrahedra(int, MaterialMode, GaussPoint * * *);
+    virtual int SetUpPointsOnWedge(int, MaterialMode, GaussPoint * * *);
     virtual int SetUpPointsOn2DEmbeddedLine(int nPoints, MaterialMode mode, GaussPoint ***,
                                     const FloatArray **coords);
 };

@@ -189,6 +189,7 @@ enum classType {
     LatticeStructuralElementClass,
     Lattice2dClass,
     LatticeMaterialStatusClass,
+    TrDirShellClass,
 
     MacroLSpaceClass,
     MicroMaterialClass,
