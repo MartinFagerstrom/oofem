@@ -460,6 +460,14 @@ public:
      */
     double *givePointer()  const { return values; }
 
+    /**
+     * Reciever will be a 3x3 matrix formed from a vector with either 9 or 6 components.
+	 * Order of matrix components in vector: 11, 22, 33, 23, 13, 12, 32, 31, 21 
+	 * If size(aArray) = 6, a symmetric matrix will be created.
+	 * @param aArray Array to transform.
+     */
+    void beMatrixForm(const FloatArray &aArray);
+
     // Overloaded methods:
     contextIOResultType storeYourself(DataStream *stream, ContextMode mode);
     contextIOResultType restoreYourself(DataStream *stream, ContextMode mode);
