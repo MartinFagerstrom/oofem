@@ -67,7 +67,7 @@ class TrDirShell : public NLStructuralElement
 {
 protected:
     int numberOfGaussPoints;	
-	static FEI3dShellTrQuad interpolation;
+	//static FEI3dShellTrQuad interpolation;
 
     static bool __initialized;
 	static IntArray ordering_x;
@@ -104,7 +104,7 @@ public:
     virtual void evaldNdxi(FloatMatrix &answer, const FloatArray &lcoords);
 	void   giveDerivativeXi(FloatArray &n, const FloatArray &lcoords);
     void   giveDerivativeEta(FloatArray &n, const FloatArray &lcoords);
-
+	virtual double computeVolumeAround(GaussPoint *gp);
 
 	// Base vectors
 	void evalInitialDirectorAt(GaussPoint *gp, FloatArray &answer);
@@ -118,9 +118,10 @@ public:
 	void evalCovarBaseVectorsAt(GaussPoint *gp, FloatArray &g1, FloatArray &g2, FloatArray &g3, TimeStep *tStep);
 	void evalContravarBaseVectorsAt(GaussPoint *gp, FloatArray &g1, FloatArray &g2, FloatArray &g3, TimeStep *tStep);
 
+	void giveUpdatedSolutionVector(FloatArray &answer, TimeStep *tStep);
 
 		// Stress and strain
-	void computeFAt(GaussPoint *gp, FloatMatrix &answer);
+	void computeFAt(GaussPoint *gp, FloatMatrix &answer, TimeStep *stepN);
 	void computeCovarStressAt(GaussPoint *gp, FloatArray &answer);
 	void transInitialCartesianToInitialContravar(GaussPoint *gp, const FloatArray &VoightMatrix, FloatArray &answer);
 
@@ -133,7 +134,7 @@ public:
 
 	virtual integrationDomain  giveIntegrationDomain() { return _Triangle; } // write new wedge-like type
 
-    virtual void printOutputAt(FILE *file, TimeStep *tStep);
+	virtual void printOutputAt(FILE *file, TimeStep *tStep);
 
 	virtual void computeBmatrixAt(GaussPoint *gp, FloatMatrix &answer, int li = 1, int ui = ALL_STRAINS);
 	virtual void computeNmatrixAt(GaussPoint *gp, FloatMatrix &answer);
@@ -144,6 +145,7 @@ public:
                                              MatResponseMode rMode, GaussPoint *gp,
                                              TimeStep *tStep);
 	
+	virtual void computeLumpedMassMatrix(FloatMatrix &answer, TimeStep *tStep);
 	virtual void computeMassMatrix(FloatMatrix &answer, TimeStep *tStep);
     void computeConvectiveMassForce(FloatArray &answer, TimeStep *tStep);
     void computeThicknessMappingCoeff(FloatArray &answer);

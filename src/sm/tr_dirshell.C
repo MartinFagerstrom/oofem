@@ -41,7 +41,7 @@
 #include "equationid.h"
 #include "gaussintegrationrule.h"
 #include "gausspnt.h"
-#include "fei3dshelltrquad.h"
+//#include "fei3dshelltrquad.h"
 
 namespace oofem {
 	//FEI3dShellTrQuad TrDirShell :: interpolation;
@@ -237,11 +237,11 @@ TrDirShell :: giveDualBase(const FloatArray &G1, const FloatArray &G2, const Flo
 	g3.add(ginv.at(3,1),G1); g3.add(ginv.at(3,2),G2); g3.add(ginv.at(3,3),G3);
 
 	// Add test of orthogonality, should be a diagonal matrix. 
-	test.resize(3,3);
+	/*test.resize(3,3);
 	test.at(1,1) = G1.dotProduct(g1); test.at(1,2) = G1.dotProduct(g2); test.at(1,3) = G1.dotProduct(g3);
 	test.at(2,2) = G2.dotProduct(g2); test.at(2,3) = G2.dotProduct(g3); test.at(3,3) = G3.dotProduct(g3);
 	test.symmetrized();
-	test.printYourself(); 
+	test.printYourself(); */
 }
 
 void 
@@ -255,7 +255,7 @@ TrDirShell :: evalInitialDirectorAt(GaussPoint *gp, FloatArray &answer)
 	for (int i = 1; i <= 6; i++ ) {
 		answer.add( N.at(i), this->giveInitialNodeDirector(i) ); 
 	}
-	answer.printYourself();
+
 }
 
 
@@ -302,31 +302,37 @@ TrDirShell :: setupInitialNodeDirectors()
 void
 TrDirShell :: evalCovarBaseVectorsAt(GaussPoint *gp, FloatArray &g1, FloatArray &g2, FloatArray &g3, TimeStep *tStep)
 {
-	double zeta, gam=0;
+	double zeta, gam;
 	FloatArray lcoords = *gp->giveCoordinates();
 	zeta = lcoords.at(3);
 	FloatArray a;
 	FloatMatrix B;
+
 	this->computeBmatrixAt(gp, B, 1, ALL_STRAINS);
-	this->computeVectorOf(EID_MomentumBalance, VM_Total, tStep, a);
-
+	//this->computeVectorOf(EID_MomentumBalance, VM_Total, tStep, a);
+	this->giveUpdatedSolutionVector(a, tStep);
 	FloatArray eps;	      // generalized strain
-	eps.beProductOf(B,a); // [dxdxi, m, dmdxi, gam, dgamdxi]^T
+	eps.beProductOf(B,a); // [dxdxi, dmdxi, m, dgamdxi, gam]^T
 
+	
 	FloatArray dxdxi, m, dmdxi, dgamdxi, test;
 	dxdxi.setValues(6, eps.at(1), eps.at(2), eps.at(3), eps.at(4), eps.at(5), eps.at(6) );
-	m.setValues(3, eps.at(7), eps.at(8), eps.at(9) );
-	dmdxi.setValues(6, eps.at(10), eps.at(11), eps.at(12), eps.at(13), eps.at(14), eps.at(15) );
-	gam = eps.at(16);
-	dgamdxi.setValues(2, eps.at(17), eps.at(18) );
-	
-	
-	g1.resize(3); g2.resize(3); g3.resize(3);
-	g1.zero(); g2.zero(); g3.zero();
+	dxdxi.printYourself();
+	m.setValues(3, eps.at(13), eps.at(14), eps.at(15) );
+	m.printYourself();
+	dmdxi.setValues(6, eps.at(7), eps.at(8), eps.at(9), eps.at(10), eps.at(11), eps.at(12) );
+	dmdxi.printYourself();
+	gam = eps.at(18);
+	dgamdxi.setValues(2, eps.at(16), eps.at(17) );
+	dgamdxi.printYourself();
+
+	g1.resize(3), g2.resize(3), g3.resize(3);
 	double fac1 = ( zeta + 0.5*gam*zeta*zeta );
 	double fac2 = ( 0.5*zeta*zeta );
 	double fac3 = ( 1.0 + zeta*gam );
-
+	
+	// first compute as initial base vectors and then update, gi = Gi + u,i
+	//this->evalInitialCovarBaseVectorsAt(gp, g1, g2, g3);
 	g1.at(1) = dxdxi.at(1) + fac1*dmdxi.at(1) + fac2*m.at(1)*dgamdxi.at(1);
 	g1.at(2) = dxdxi.at(2) + fac1*dmdxi.at(2) + fac2*m.at(2)*dgamdxi.at(1);
 	g1.at(3) = dxdxi.at(3) + fac1*dmdxi.at(3) + fac2*m.at(3)*dgamdxi.at(1);
@@ -339,9 +345,6 @@ TrDirShell :: evalCovarBaseVectorsAt(GaussPoint *gp, FloatArray &g1, FloatArray 
 	g3.at(2) = fac3*m.at(2); 
 	g3.at(3) = fac3*m.at(3);
 
-	g1.printYourself();
-	g2.printYourself();
-	g3.printYourself();
 
 	// Extract x, m, gam from solution vector
 	/*
@@ -367,7 +370,7 @@ TrDirShell :: evalCovarBaseVectorsAt(GaussPoint *gp, FloatArray &g1, FloatArray 
 void
 TrDirShell :: giveDofManDofIDMask(int inode, EquationID ut, IntArray &answer) const
 {
-    answer.setValues(7, D_u, D_v, D_w, m_u, m_v, m_w, gam);
+    answer.setValues(7, D_u, D_v, D_w, w_u, w_v, w_w, gam);
 }
 
 
@@ -485,6 +488,7 @@ TrDirShell :: computeNmatrixAt(GaussPoint *gp, FloatMatrix &answer)
 	FloatMatrix dNdxi;
 	this->evalN(N, lcoords);
 
+
 	/*    18   18    6
   	   3 [N_x   0    0
 	   3   0   N_m   0
@@ -512,7 +516,7 @@ TrDirShell :: computeNmatrixAt(GaussPoint *gp, FloatMatrix &answer)
 void
 TrDirShell :: computeBmatrixAt(GaussPoint *gp, FloatMatrix &answer, int li , int ui)
 /* Returns the  matrix {B} of the receiver, evaluated at aGaussPoint. Such that
-   B*a = [dphidxi, m, dmdxi, gam, dgamdxi]^T, where a is the vector of unknowns
+   B*a = [dxbar_dxi, dwdxi, w, dgamdxi, gam]^T, where a is the vector of unknowns
 */
 {
 	FloatArray lcoords = *gp->giveCoordinates();
@@ -524,11 +528,11 @@ TrDirShell :: computeBmatrixAt(GaussPoint *gp, FloatMatrix &answer, int li , int
 	this->evaldNdxi(dNdxi, lcoords);
 
 	/*    18   18   6
-  	   6 [B_x   0   0
-	   3   0   N_x  0
-	   6   0   B_m  0
-	   1   0    0  N_m 
-	   2   0    0  B_gam] 
+  	   6 [B_u   0   0
+	   6   0   B_w  0
+	   3   0   N_w  0
+	   2   0    0  B_gam 
+	   1   0    0  N_gam] 
 	*/
 	
 	int i, j, pos;
@@ -545,25 +549,25 @@ TrDirShell :: computeBmatrixAt(GaussPoint *gp, FloatMatrix &answer, int li , int
 	// Second column
 	pos =18;
 	for( i = 1, j = 0; i<=6; i++, j+=3  ){ 
-		answer.at(6+1,pos+1+j) = N.at(i);
-		answer.at(6+2,pos+2+j) = N.at(i);
-		answer.at(6+3,pos+3+j) = N.at(i);
-		answer.at(6+4,pos+1+j) = dNdxi.at(i,1);
-		answer.at(6+5,pos+2+j) = dNdxi.at(i,1);
-		answer.at(6+6,pos+3+j) = dNdxi.at(i,1);
-		answer.at(6+7,pos+1+j) = dNdxi.at(i,2);
-		answer.at(6+8,pos+2+j) = dNdxi.at(i,2);
-		answer.at(6+9,pos+3+j) = dNdxi.at(i,2);
+		answer.at(6+1,pos+1+j) = dNdxi.at(i,1);
+		answer.at(6+2,pos+2+j) = dNdxi.at(i,1);
+		answer.at(6+3,pos+3+j) = dNdxi.at(i,1);
+		answer.at(6+4,pos+1+j) = dNdxi.at(i,2);
+		answer.at(6+5,pos+2+j) = dNdxi.at(i,2);
+		answer.at(6+6,pos+3+j) = dNdxi.at(i,2);
+		answer.at(6+7,pos+1+j) = N.at(i);
+		answer.at(6+8,pos+2+j) = N.at(i);
+		answer.at(6+9,pos+3+j) = N.at(i);
 	}
 
 	// Third column
 	pos =36;
 	for( i = 1, j = 0; i<=6; i++, j+=1  ){ 
-		answer.at(15+1,pos+1+j) = N.at(i);
-		answer.at(15+2,pos+1+j) = dNdxi.at(i,1);
-		answer.at(15+3,pos+1+j) = dNdxi.at(i,2);
+		answer.at(15+1,pos+1+j) = dNdxi.at(i,1);
+		answer.at(15+2,pos+1+j) = dNdxi.at(i,2);
+		answer.at(15+3,pos+1+j) = N.at(i);
 	}
-	//answer.printYourself();
+
 
 }
 
@@ -616,22 +620,33 @@ TrDirShell :: computeStiffnessMatrix(FloatMatrix &answer, MatResponseMode rMode,
 	
 	lcoords.resize(3);
 	lcoords.setValues(3, .3333, .3333, 0.); // xi1, xi2, zeta
-	//this->evalContravarBaseVectors(G, lcoords, cellgeo, zeta);
-	this->evalInitialDirectorAt(gp, m);
 
 
-	lcoords.setValues(3, 1., 0., 0.); 
-	this->evalInitialCovarBaseVectorsAt(gp, G1, G2, G3);
-	G1.printYourself();
-	G2.printYourself();
 
-	this->evalInitialContravarBaseVectorsAt(gp, G1, G2, G3);
-	this->evalCovarBaseVectorsAt(gp, g1, g2, g3, tStep);
+	answer.resize(42,42);
+	answer.beUnitMatrix();
+}
+
+
+void 
+TrDirShell :: computeFAt(GaussPoint *gp, FloatMatrix &answer, TimeStep *stepN){
 	
-	FloatArray E;
-	this->computeStrainVector( E, gp, tStep);
-    FloatMatrix Mass;
-    this->computeMassMatrix(Mass, tStep);
+	FloatArray gcov1, gcov2, gcov3, Gcon1, Gcon2, Gcon3;
+	this->evalCovarBaseVectorsAt(gp, gcov1, gcov2, gcov3, stepN);
+	this->evalInitialContravarBaseVectorsAt(gp, Gcon1, Gcon2, Gcon3);
+	gcov1.printYourself();
+	gcov2.printYourself();
+	gcov3.printYourself();
+	Gcon1.printYourself();
+	Gcon2.printYourself();
+	Gcon3.printYourself();
+	FloatMatrix F, F1, F2, F3;
+	answer.resize(3,3); answer.zero();
+	F1.beDyadicProductOf(gcov1,Gcon1);
+	F2.beDyadicProductOf(gcov2,Gcon2);
+	F3.beDyadicProductOf(gcov3,Gcon3);
+
+	answer.add(F1);	answer.add(F2);	answer.add(F3);
 }
 
 
@@ -643,18 +658,9 @@ TrDirShell :: computeStrainVector(FloatArray &answer, GaussPoint *gp, TimeStep *
 {
 
 	// Deformation gradient
-	FloatArray gcov1, gcov2, gcov3, Gcon1, Gcon2, Gcon3;
-	this->evalCovarBaseVectorsAt(gp, gcov1, gcov2, gcov3, stepN);
-	this->evalInitialContravarBaseVectorsAt(gp, Gcon1, Gcon2, Gcon3);
-
-	FloatMatrix F, F1, F2, F3;
-	F.resize(3,3); F.zero();
-	F1.beDyadicProductOf(gcov1,Gcon1);
-	F2.beDyadicProductOf(gcov2,Gcon2);
-	F3.beDyadicProductOf(gcov3,Gcon3);
-
-	F.add(F1);	F.add(F2);	F.add(F3);
-
+	FloatMatrix F;
+	this->computeFAt(gp, F, stepN);
+	F.printYourself();
 	// Green-Lagrange strain tensor
 	FloatMatrix temp, E;
 	temp.beTProductOf(F,F);
@@ -663,13 +669,17 @@ TrDirShell :: computeStrainVector(FloatArray &answer, GaussPoint *gp, TimeStep *
 	temp.at(3,3) += -1;
 	E.add(0.5, temp);
 	
-	E.printYourself();
+	//E.printYourself();
 
-	answer.resize(6);
-    answer.zero();
-	answer.setValues(6, E.at(1,1), E.at(2,2), E.at(3,3), E.at(1,2), E.at(1,3), E.at(2,3) ); // What is the order in Voight??
+	//answer.resize(6);
+    //answer.zero();
+	// Voight order: 11, 22, 33, 23, 13, 12
+	answer.beReducedVectorForm(E);
+	answer.printYourself();
+	//answer.setValues(6, E.at(1,1), E.at(2,2), E.at(3,3), E.at(2,3), E.at(1,3), E.at(1,2) ); 
 
 }
+
 
 void
 TrDirShell :: transInitialCartesianToInitialContravar(GaussPoint *gp, const FloatArray &VoightMatrix, FloatArray &answer){
@@ -681,26 +691,52 @@ TrDirShell :: transInitialCartesianToInitialContravar(GaussPoint *gp, const Floa
     E1.zero(); E2.zero(); E3.zero();
     E1.at(1) = E2.at(2) = E3.at(1) = 1.;
 
+	// Transformation matrix
     // Todo: Simplify! E1-E3 are cartesian vectors so the dot products will only be components of G1-G3
     FloatMatrix EG(3,3), EGt(3,3);
     EG.at(1,1) = E1.dotProduct(Gcov1); EG.at(1,2) = E1.dotProduct(Gcov2); EG.at(1,3) = E1.dotProduct(Gcov3);
     EG.at(2,2) = E2.dotProduct(Gcov2); EG.at(2,3) = E2.dotProduct(Gcov3); EG.at(3,3) = E3.dotProduct(Gcov3);
     EG.symmetrized();
-
-    EGt.beTranspositionOf(EG);
-    //answer.at(1) = EGt.at(1, 1)*VoightMatrix(1)*EG.at()
+	EGt.beTranspositionOf(EG);
+	
+	// transform according to: EG^T*mat*EG
     FloatMatrix temp(3,3), mat(3,3);
-    temp.zero(); 
-    mat.at(1,1) = VoightMatrix.at(1); mat.at(2,2) = VoightMatrix.at(2); mat.at(3,3) = VoightMatrix.at(3); 
-    mat.at(1,2) = VoightMatrix.at(4); mat.at(1,3) = VoightMatrix.at(5); mat.at(2,3) = VoightMatrix.at(6);
-    mat.symmetrized();
-
+	mat.beMatrixForm(VoightMatrix);
     temp.beProductTOf(EG,mat);
     temp.beProductOf(temp,EG);
-    answer.resize(6);
-    answer.setValues(6, temp.at(1,1), temp.at(2,2),  temp.at(3,3), temp.at(1,2), temp.at(1,3), temp.at(2,3) );
+	answer.beReducedVectorForm(temp);
+
 }
 
+
+void
+TrDirShell :: giveUpdatedSolutionVector(FloatArray &answer, TimeStep *tStep){
+	
+	FloatArray *Xi, Mi,temp;
+	this->computeVectorOf(EID_MomentumBalance, VM_Total, tStep, temp);
+	temp.resize(42);
+	for( int i = 1, j = 0; i <= 6; i++, j += 7 ){
+		Xi = this->giveNode(i)->giveCoordinates();
+		Mi = this->giveInitialNodeDirector(i);
+		temp.at(1+j) += Xi->at(1);
+		temp.at(2+j) += Xi->at(2);
+		temp.at(3+j) += Xi->at(3);
+		temp.at(4+j) += Mi.at(1);
+		temp.at(5+j) += Mi.at(2);
+		temp.at(6+j) += Mi.at(3);
+		//answer.at(7+j) += 0, gam(t=0)=0 so no update necessary
+	}
+	answer.resize(42);
+	for( int i = 1; i <= 18; i++ ){
+		answer.at(i)    = temp.at( ordering_x.at(i) );
+		answer.at(i+18) = temp.at( ordering_m.at(i) );
+	}
+	for( int i = 1; i <= 6; i++ ){
+		answer.at(i+36)    = temp.at( ordering_gam.at(i) );
+	}
+
+	// group same fields together
+}
 
 
 void
@@ -722,7 +758,7 @@ TrDirShell :: giveInternalForcesVector(FloatArray &answer,
     FloatArray lcoords;
     double zeta;
     FloatMatrix B, Bt;
-    FloatArray cartStressVector, contravarStressVector, sectionalForces, BF;
+    FloatArray cartStressVector, contravarStressVector, sectionalForces, BF, a;
     double dV;
 
     // do not resize answer to computeNumberOfDofs(EID_MomentumBalance)
@@ -759,13 +795,29 @@ TrDirShell :: giveInternalForcesVector(FloatArray &answer,
         FloatArray f(18), g1, g2, g3, S1g(3), S2g(3), S3g(3), m(3), dm1(3), dm2(3);
         this->transInitialCartesianToInitialContravar(gp, cartStressVector, contravarStressVector);
         this->evalCovarBaseVectorsAt(gp, g1, g2, g3, tStep);
-        FloatMatrix S; int j;
-        double fac1, fac2, fac3, dg1, dg2;
+        FloatMatrix S; 
+		S.beMatrixForm(cartStressVector);
+        double fac1, fac2, fac3, gam, dg1, dg2;
+
+		this->computeBmatrixAt(gp, B);
+		this->giveUpdatedSolutionVector(a,tStep);
+		FloatArray eps;	      // generalized strain
+		eps.beProductOf(B,a); // [dxdxi, dmdxi, m, dgamdxi, gam]^T
+
+		FloatArray dxdxi, dmdxi, dgamdxi;
+		dm1.setValues( 3, eps.at(7), eps.at(8), eps.at(9) );
+		dm2.setValues( 3, eps.at(10), eps.at(11), eps.at(12) );
+		m.setValues(3, eps.at(13), eps.at(14), eps.at(15) );
+		dg1 = eps.at(16);
+		dg2 = eps.at(17);
+		gam = eps.at(18);
+
+
         fac1 = zeta + 0.5*gam*zeta*zeta;
         fac2 = 1. + gam*zeta;
         fac3 = 0.5*zeta*zeta;
 
-
+		// S1g =S(1,i)*g_j, etc
         for( int j=1; j<=3; j++){
             S1g.at(j) = S.at(1,1)*g1.at(j) + S.at(1,2)*g2.at(j) + S.at(1,3)*g3.at(j);
             S2g.at(j) = S.at(2,1)*g1.at(j) + S.at(2,2)*g2.at(j) + S.at(2,3)*g3.at(j);
@@ -799,13 +851,7 @@ TrDirShell :: giveInternalForcesVector(FloatArray &answer,
         // Ts
         f.at(18) = fac3 * ( dm1.dotProduct(S1g) + dm2.dotProduct(S2g) + zeta * m.dotProduct(S3g)  ) ;
             
-
-        //
-        // now every gauss point has real stress vector
-        //
-        // compute nodal representation of internal forces using f = B^T*Sigma dV
-        //
-        this->computeBmatrixAt(gp, B);
+        // compute nodal representation of internal forces using f = B^T*f*dV
         Bt.beTranspositionOf(B);
         dV = this->computeVolumeAround(gp);
         BF.beProductOf(Bt, f);
@@ -822,7 +868,19 @@ TrDirShell :: giveInternalForcesVector(FloatArray &answer,
 
 }
 
+void 
+TrDirShell :: computeLumpedMassMatrix(FloatMatrix &answer, TimeStep *tStep){
+	FloatMatrix mConsistent;
+	this->computeMassMatrix(mConsistent, tStep);
+	// Reduce to lumped form 
+	// Todo: add algorithm for this
+	//answer.resize(mConsistent);
+	answer.resize(42,42); answer.zero();
+	for( int i = 1; i<=42; i++){
+		answer.at(i,i) = mConsistent.at(i,i);
+	}
 
+}
 
 
 void 
@@ -830,55 +888,65 @@ TrDirShell :: computeMassMatrix(FloatMatrix &answer, TimeStep *tStep){
 	// Analytically integrated over the thickness. Constant density assumed.
 	IntegrationRule *iRule = integrationRulesArray [ 0 ];
 	GaussPoint *gp;
-	gp = iRule->getIntegrationPoint(0);
 
 	//------------------------------
-    FloatMatrix N;
+    FloatMatrix N, Nt, Ntm, NtmN, mass;
     FloatArray a, unknowns, m(3);
-    double gam;
-    this->computeNmatrixAt(gp, N);
-	this->computeVectorOf(EID_MomentumBalance, VM_Total, tStep, a);
-      
-    unknowns.beProductOf(N,a); // [x, m, gam]^T
-	m.setValues(3, unknowns.at(4), unknowns.at(5), unknowns.at(6) );
-	gam = unknowns.at(7);
-    //------------------------------
+    double gam, dV;
+    
+	answer.resize(42,42); answer.zero();
+	for ( int i = 0; i < iRule->getNumberOfIntegrationPoints(); i++ ) {
+        gp = iRule->getIntegrationPoint(i);
 
-    // Consistent mass matrix
-	/*     3    3    1
-  	   3 [a*I  b*I   c*m
-	   3       d*I   e*m
-	   q  sym       f*m.m]
-	*/
-    double a1, a2, a3;
-    FloatArray coeff;
-    this->computeThicknessMappingCoeff(coeff);
-    a1 = coeff.at(1); a2 = coeff.at(2); a3 = coeff.at(3);
+		this->giveUpdatedSolutionVector(a, tStep);
+		this->computeNmatrixAt(gp, N);
+		unknowns.beProductOf(N,a); // [x, m, gam]^T
+		m.setValues(3, unknowns.at(4), unknowns.at(5), unknowns.at(6) );
+		gam = unknowns.at(7);
+		//------------------------------
+
+		// Consistent mass matrix
+		/*     3    3    1
+  		   3 [a*I  b*I   c*m      [A  B  C
+		   3       d*I   e*m    =     D  E
+		   q  sym       f*m.m]     sym   F]
+		*/
+		double a1, a2, a3;
+		FloatArray coeff;
+		this->computeThicknessMappingCoeff(coeff);
+		a1 = coeff.at(1); a2 = coeff.at(2); a3 = coeff.at(3);
 
 
-    double h, h2, h3, h5, fac1, fac2, fac3, fac4, fac5, fac6, gam2, rho; 
-    rho = this->giveMaterial()->give('d', gp);
-    h = this->giveCrossSection()->give(CS_Thickness);
-    h2 = h*h; h3 = h2*h; h5 = h2*h3;
-    gam2 = gam*gam;
+		double h, h2, h3, h5, fac1, fac2, fac3, fac4, fac5, fac6, gam2, rho; 
+		rho = this->giveMaterial()->give('d', gp);
+		h = this->giveCrossSection()->give(CS_Thickness);
+		h2 = h*h; h3 = h2*h; h5 = h2*h3;
+		gam2 = gam*gam;
 
-    answer.resize(7,7);
-    fac1 = a3*h + (a1*h3)/12.;
-    fac2 = h3*(40.*a2 + 20.*a3*gam + 3.*a1*h2*gam)/480.;
-    fac3 = h3*(20.*a3 + 3.*a1*h2)/480.;
-    fac4 = (28.*a3*h3*(80. + 3.*h2*gam2) + 3.*h5*(112.*a2*gam + a1*(112. + 5.*h2*gam2)))/26880.;
-    fac5 = h*(56.*a2 + 28.*a3*gam + 5.*a1*h2*gam)/8960.;
-    fac6 = h5*(28.*a3 + 5.*a1*h2)/8960.;
-    answer.at(1,1) = answer.at(2,2) = answer.at(3,3) = fac1;
-    answer.at(1,4) = answer.at(2,5) = answer.at(3,6) = fac2;
-    answer.at(1,7) = fac3 * m.at(1); 
-    answer.at(2,7) = fac3 * m.at(2);  
-    answer.at(3,7) = fac3 * m.at(3); 
-    answer.at(4,4) = answer.at(5,5) = answer.at(6,6) = fac4;
-    answer.at(4,7) = fac5 * m.at(1); 
-    answer.at(5,7) = fac5 * m.at(2);  
-    answer.at(6,7) = fac5 * m.at(3); 
-    answer.at(7,7) = fac6 * m.dotProduct(m); 
+		mass.resize(7,7);
+		fac1 = a3*h + (a1*h3)/12.;
+		fac2 = h3*(40.*a2 + 20.*a3*gam + 3.*a1*h2*gam)/480.;
+		fac3 = h3*(20.*a3 + 3.*a1*h2)/480.;
+		fac4 = (28.*a3*h3*(80. + 3.*h2*gam2) + 3.*h5*(112.*a2*gam + a1*(112. + 5.*h2*gam2)))/26880.;
+		fac5 = h*(56.*a2 + 28.*a3*gam + 5.*a1*h2*gam)/8960.;
+		fac6 = h5*(28.*a3 + 5.*a1*h2)/8960.;
+		mass.at(1,1) = answer.at(2,2) = answer.at(3,3) = fac1; // A
+		mass.at(1,4) = answer.at(2,5) = answer.at(3,6) = fac2; // B
+		mass.at(1,7) = fac3 * m.at(1);  answer.at(2,7) = fac3 * m.at(2); answer.at(3,7) = fac3 * m.at(3); // C
+		mass.at(4,4) = answer.at(5,5) = answer.at(6,6) = fac4; // D
+		mass.at(4,7) = fac5 * m.at(1);  answer.at(5,7) = fac5 * m.at(2); answer.at(6,7) = fac5 * m.at(3); // E
+		mass.at(7,7) = fac6 * m.dotProduct(m); // F
+
+        
+        Nt.beTranspositionOf(N);
+        dV = this->computeVolumeAround(gp)/h ; // Should be an area!
+        Ntm.beProductOf(Nt, mass);
+		NtmN.beProductOf(Ntm, N);
+        NtmN.times(dV);
+        answer.add(NtmN);
+    
+	}
+	
 
 /* Salars Matlab code
 function [mass,cmass]= prbf(rho,h,gam,gamd,m,md,PHI1,PHI2,M,M1,M2,bc)
@@ -935,7 +1003,7 @@ TrDirShell :: computeConvectiveMassForce(FloatArray &answer, TimeStep *tStep){
     h2 = h*h; h3 = h2*h; h5 = h2*h3;
     gam2 = gam*gam;
 
-    // Convective mass matrix
+    // Convective mass "matrix"
 	/*     3
   	   3 [ a*m
 	   3   b*m
@@ -955,7 +1023,6 @@ TrDirShell :: computeConvectiveMassForce(FloatArray &answer, TimeStep *tStep){
     answer.at(5) = fac2*md.at(2)*gamd;
     answer.at(6) = fac2*md.at(3)*gamd;
     answer.at(7) = fac3*m.dotProduct(md)*gamd;
-    answer.printYourself();
 
 
 /* Salars Matlab code
@@ -973,6 +1040,8 @@ cmass=rho*bc'*cmc;
 
 void
 TrDirShell :: computeThicknessMappingCoeff(FloatArray &answer){
+	//thickness jacobian = ratio between volume and area: j0 = a3 + a2*zeta^2 + a1 * zeta
+	// Returns array with a1-a3, used in expression for analytical integration of mass matrix.
     IntegrationRule *iRule = integrationRulesArray [ 0 ];
 	GaussPoint *gp;
 	gp = iRule->getIntegrationPoint(0);
@@ -1026,7 +1095,15 @@ TrDirShell :: computeThicknessMappingCoeff(FloatArray &answer){
 
 }
 
-
+double 
+TrDirShell :: computeVolumeAround(GaussPoint *gp){
+	FloatArray G1, G2, G3, temp;
+	double detJ;
+	this->evalInitialCovarBaseVectorsAt(gp,G1, G2, G3);
+	temp.beVectorProductOf(G1, G2);
+	detJ = temp.dotProduct(G3) * this->giveCrossSection()->give(CS_Thickness)*0.5;
+    return detJ * gp->giveWeight() ;
+}
 
 
 
